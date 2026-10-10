@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""TimesFM3 PyTorch model (inference only).
+"""TimesFM3 PyTorch model with shared differentiable/inference forecasting.
 
 Supports:
   - forward(): equivalent to Flax __call__, full-sequence forward pass.
@@ -373,7 +373,32 @@ class TimesFM3Torch(
     mask: torch.Tensor | None = None,
     return_aux_outputs: bool = False,
   ) -> Any:
+    """Inference-only compatibility entry; use forecast() to retain gradients."""
+    return self.forecast(
+      target=target, horizon=horizon,
+      past_only_covariates=past_only_covariates,
+      past_future_covariates=past_future_covariates,
+      target_mask=target_mask, past_only_mask=past_only_mask,
+      past_future_mask=past_future_mask, mask=mask,
+      return_aux_outputs=return_aux_outputs,
+    )
+
+  def forecast(
+    self,
+    target: torch.Tensor,
+    horizon: int = 0,
+    past_only_covariates: torch.Tensor | None = None,
+    past_future_covariates: torch.Tensor | None = None,
+    target_mask: torch.Tensor | None = None,
+    past_only_mask: torch.Tensor | None = None,
+    past_future_mask: torch.Tensor | None = None,
+    mask: torch.Tensor | None = None,
+    return_aux_outputs: bool = False,
+  ) -> Any:
     """Non-autoregressive single-pass decoding for TimesFM3.
+
+    Retains autograd when enabled. Labels are never inputs to this method.
+    Shares the exact detrending, CPM, RevIN and stitching path with decode().
 
     Args:
       target: (b, u, context_len).

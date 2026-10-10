@@ -1,5 +1,10 @@
 # TimesFM
 
+> **Fork extension:** experimental native TimesFM-3 supervised training and PEFT
+> LoRA are documented in [the training guide](timesfm3-usage/finetuning/README.md).
+> The original inference path remains available. This is not an official Google
+> training release; real-checkpoint/GPU training quality remains unverified.
+
 TimesFM (Time Series Foundation Model) is a pretrained time-series foundation
 model developed by Google Research for time-series forecasting.
 

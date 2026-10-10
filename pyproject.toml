@@ -20,6 +20,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+train = [
+    "torch>=2.8.0",
+    "peft>=0.17.1,<0.18",
+    "transformers>=4.55.4,<4.56",
+]
 torch = [
     "torch>=2.0.0",
 ]

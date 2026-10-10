@@ -27,6 +27,16 @@ from safetensors import torch as safetensors_torch
 _TOLERANCE = 1e-6
 
 
+def _sqrt_with_zero_grad(values: torch.Tensor) -> torch.Tensor:
+  """Preserve sqrt values, defining a finite zero subgradient at zero.
+
+  torch.where alone cannot mask sqrt(0)'s infinite backward derivative. Avoid
+  evaluating that branch at zero in the first place (constant/masked patches).
+  """
+  nonzero = values != 0
+  return torch.where(nonzero, torch.sqrt(torch.where(nonzero, values, 1.0)), 0.0)
+
+
 def _make_safe_for_division(values: torch.Tensor) -> torch.Tensor:
   """Handles near zero values."""
   return torch.where(values < _TOLERANCE, 1.0, values)
@@ -125,7 +135,8 @@ def update_running_stats(
   # mean of valid elements in patch
   x_masked = torch.where(is_legit, x, torch.zeros_like(x))
   inc_sum = x_masked.sum(dim=-1)
-  inc_mu = torch.where(inc_n == 0, torch.zeros_like(inc_sum), inc_sum / inc_n)
+  safe_inc_n = inc_n.clamp_min(1.0)
+  inc_mu = torch.where(inc_n == 0, torch.zeros_like(inc_sum), inc_sum / safe_inc_n)
 
   # std of valid elements in patch
   x_diff_sq = torch.where(
@@ -134,17 +145,18 @@ def update_running_stats(
   inc_var = torch.where(
     inc_n == 0,
     torch.zeros_like(inc_sum),
-    x_diff_sq.sum(dim=-1) / inc_n,
+    x_diff_sq.sum(dim=-1) / safe_inc_n,
   )
-  inc_sigma = torch.sqrt(inc_var)
+  inc_sigma = _sqrt_with_zero_grad(inc_var)
 
   new_n = n + inc_n
+  safe_new_n = new_n.clamp_min(1.0)
   new_mu = torch.where(
     new_n == 0,
     torch.zeros_like(mu),
-    (n * mu + inc_mu * inc_n) / new_n,
+    (n * mu + inc_mu * inc_n) / safe_new_n,
   )
-  new_sigma = torch.sqrt(
+  new_sigma = _sqrt_with_zero_grad(
     torch.where(
       new_n == 0,
       torch.zeros_like(sigma),
@@ -154,7 +166,7 @@ def update_running_stats(
         + n * (mu - new_mu) * (mu - new_mu)
         + inc_n * (inc_mu - new_mu) * (inc_mu - new_mu)
       )
-      / new_n,
+      / safe_new_n,
     )
   )
   return new_n, new_mu, new_sigma
